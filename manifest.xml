@@ -39,7 +39,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=1"/>
+        <SourceLocation DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=2"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -147,8 +147,8 @@
       </bt:Images>
 
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/commands.html?v=1"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=1"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/commands.html?v=2"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=2"/>
       </bt:Urls>
 
       <bt:ShortStrings>
@@ -206,8 +206,8 @@
           <bt:Image id="Icon.80x80" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/commands.html?v=1"/>
-          <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=1"/>
+          <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/commands.html?v=2"/>
+          <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=2"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Hub"/>
