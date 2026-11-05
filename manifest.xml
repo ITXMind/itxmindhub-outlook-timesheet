@@ -14,8 +14,8 @@
   <Description DefaultValue="Regista no ITXMind Hub as horas das marcações do calendário que contêm um ID de oportunidade (OPP)"/>
 
   <!-- TODO: trocar BASE_URL pelo URL HTTPS onde esta pasta for alojada -->
-  <IconUrl DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-80.png"/>
   <SupportUrl DefaultValue="https://hub.itxmind.com"/>
 
   <AppDomains>
@@ -39,7 +39,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/index.html?v=1"/>
+        <SourceLocation DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=1"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -141,14 +141,14 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-80.png"/>
       </bt:Images>
 
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/commands.html?v=1"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/index.html?v=1"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/commands.html?v=1"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=1"/>
       </bt:Urls>
 
       <bt:ShortStrings>
@@ -201,13 +201,13 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16x16" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-16.png"/>
-          <bt:Image id="Icon.32x32" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-32.png"/>
-          <bt:Image id="Icon.80x80" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/assets/icon-80.png"/>
+          <bt:Image id="Icon.16x16" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-16.png"/>
+          <bt:Image id="Icon.32x32" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-32.png"/>
+          <bt:Image id="Icon.80x80" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/commands.html?v=1"/>
-          <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/index.html?v=1"/>
+          <bt:Url id="Commands.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/commands.html?v=1"/>
+          <bt:Url id="Taskpane.Url" DefaultValue="https://itxmind.github.io/itxmindhub-outlook-timesheet/taskpane/index.html?v=1"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Hub"/>

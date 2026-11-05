@@ -21,6 +21,6 @@ cards (utilizador + tempo) na tab **Calendário** do projeto. Não cria registos
 2. **Entra ID:** registar uma app SPA com permissão delegada `Calendars.Read`, redirect URI
    `brk-multihub://itxmind.github.io`, e pré-autorizar o Outlook. Colocar o Client ID em
    `GRAPH_CLIENT_ID` (`taskpane/index.html`) e no `<WebApplicationInfo>` do `manifest.xml`.
-3. **Alojamento:** publicar esta pasta em HTTPS e ajustar o URL base (`itxmind.github.io/Outlook-Timesheet-Addin`)
+3. **Alojamento:** publicar esta pasta em HTTPS e ajustar o URL base (`itxmind.github.io/itxmindhub-outlook-timesheet`)
    no `manifest.xml`, `HUB_LOGIN_URL` em `taskpane/index.html`.
 4. Instalar o `manifest.xml` no Outlook (Aplicações → Adicionar suplementos personalizados).
