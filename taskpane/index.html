@@ -474,15 +474,35 @@
     });
 
     // ── Microsoft Graph (Nested App Auth) ────────────────────────────────────
+    // Carrega o MSAL sob demanda (com 2 CDNs) em vez de depender de um <script> estático
+    function loadScript(src) {
+      return new Promise((res, rej) => {
+        const el = document.createElement('script');
+        el.src = src; el.onload = res; el.onerror = () => rej(new Error('Falha ao carregar ' + src));
+        document.head.appendChild(el);
+      });
+    }
+    async function ensureMsal() {
+      if (window.msal) return;
+      const urls = [
+        'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js',
+        'https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js',
+      ];
+      for (const u of urls) {
+        try { await loadScript(u); if (window.msal) return; } catch (e) {}
+      }
+      throw new Error('Não foi possível carregar a biblioteca de autenticação Microsoft (MSAL). Verifica a ligação e tenta novamente.');
+    }
+
     let msalPromise = null;
     function getMsal() {
       if (!msalPromise) {
         if (!GRAPH_CLIENT_ID || GRAPH_CLIENT_ID.startsWith('0000')) {
           return Promise.reject(new Error('Falta configurar o Client ID do Entra ID (GRAPH_CLIENT_ID em taskpane/index.html). Ver README.'));
         }
-        msalPromise = msal.createNestablePublicClientApplication({
+        msalPromise = ensureMsal().then(() => msal.createNestablePublicClientApplication({
           auth: { clientId: GRAPH_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + GRAPH_TENANT_ID },
-        });
+        })).catch(e => { msalPromise = null; throw e; });
       }
       return msalPromise;
     }
