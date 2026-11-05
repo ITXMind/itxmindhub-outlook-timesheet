@@ -1,7 +1,7 @@
 # Hub – Horas do Calendário (Outlook add-in)
 
 Lê as marcações do calendário do utilizador, filtra as que contêm um ID de oportunidade
-(`OPP-YY-NNNNNN`), faz match com projetos do ITXMind Hub e regista-as para aparecerem como
+(`OPP-…`, ex.: `OPP-26-0000123` ou `OPP-TESTE`), faz match com projetos do ITXMind Hub e regista-as para aparecerem como
 cards (utilizador + tempo) na tab **Calendário** do projeto. Não cria registos de tempo em tarefas.
 
 ## Como funciona
@@ -16,7 +16,7 @@ cards (utilizador + tempo) na tab **Calendário** do projeto. Não cria registos
 
 ## Antes de usar
 
-1. **Hub:** aplicar a migração `supabase/migrations/20261105120000_project_calendar_events.sql`
+1. **Hub:** aplicar a migração `20261105120000_project_calendar_events.sql` e `20261105130000_match_opps_by_project_name.sql`
    (repo `itxmind-hub`). A tab Calendário já mostra os dados (`CalendarView.tsx`).
 2. **Entra ID:** registar uma app SPA com permissão delegada `Calendars.Read`, redirect URI
    `brk-multihub://itxmind.github.io`, e pré-autorizar o Outlook. Colocar o Client ID em

@@ -226,11 +226,12 @@
     const GRAPH_TENANT_ID   = 'a49a409e-8c48-4d87-94bd-e104ae726d92';
     const GRAPH_SCOPES      = ['Calendars.Read'];
 
-    // ID de oportunidade: OPP-YY-NNNNNN(N) — o mesmo formato usado pelo Hub (extract_opp_numbers)
+    // ID de oportunidade: qualquer "OPP-..." (ex.: OPP-26-0000123 ou OPP-TESTE). Quem decide se é válido é o Hub:
+    // só conta se fizer match com um projeto (nº de OPP ou nome do projeto).
     // true: ao abrir lê o calendário e regista logo o que fizer match (sem confirmar). false: pede confirmação.
     const AUTO_REGISTER = true;
 
-    const OPP_REGEX = /OPP-\d{2}-\d{6,7}/gi;
+    const OPP_REGEX = /OPP-[A-Z0-9]+(?:-[A-Z0-9]+)*/gi;
 
     let supabaseClient = null;
     let currentUser    = null;
