@@ -50,12 +50,29 @@
       font-size: 15px; font-weight: 800; line-height: 1.2;
     }
     .header-text p { font-size: 11px; color: var(--text-muted); }
+    .user-menu { margin-left: auto; position: relative; }
     .user-badge {
-      margin-left: auto; font-size: 11px; color: var(--text-muted);
-      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font: inherit; font-size: 11px; color: var(--text-muted); background: none; border: none;
+      display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 2px;
     }
     .user-badge:hover { color: var(--text); }
     .user-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .user-badge .caret { font-size: 9px; }
+    .user-dropdown {
+      display: none; position: absolute; right: 0; top: calc(100% + 6px); min-width: 200px; z-index: 50;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(26,31,54,.12); padding: 6px;
+    }
+    .user-dropdown.show { display: block; }
+    .user-dropdown-email {
+      padding: 8px 10px; font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere;
+      border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    }
+    .user-dropdown-item {
+      display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; font-weight: 500;
+      color: var(--danger); background: none; border: none; border-radius: 6px; padding: 8px 10px; cursor: pointer;
+    }
+    .user-dropdown-item:hover { background: #fef2f2; }
 
     .section { display: none; }
     .section.active { display: block; }
@@ -158,9 +175,16 @@
       <h1>ITXMind Hub</h1>
       <p>Horas do calendário por OPP</p>
     </div>
-    <div class="user-badge" id="userBadge" style="display:none" onclick="handleSignOut()" title="Terminar sessão">
-      <div class="dot"></div>
-      <span id="userEmail">–</span>
+    <div class="user-menu" id="userBadge" style="display:none">
+      <button class="user-badge" id="userBtn" type="button" onclick="toggleUserMenu(event)" aria-haspopup="true" aria-expanded="false">
+        <span class="dot"></span>
+        <span id="userEmail">–</span>
+        <span class="caret">▾</span>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="user-dropdown-email" id="userDropdownEmail"></div>
+        <button class="user-dropdown-item" type="button" onclick="handleSignOut()">Terminar sessão</button>
+      </div>
     </div>
   </div>
 
@@ -184,24 +208,6 @@
     <div class="alert alert-error"   id="syncError"></div>
     <div class="alert alert-success" id="syncSuccess"></div>
 
-    <div class="row field">
-      <div>
-        <label class="lbl" for="dateFrom">De</label>
-        <input type="date" id="dateFrom" />
-      </div>
-      <div>
-        <label class="lbl" for="dateTo">Até</label>
-        <input type="date" id="dateTo" />
-      </div>
-    </div>
-    <div class="chips">
-      <button class="chip" onclick="setRange('week')">Esta semana</button>
-      <button class="chip" onclick="setRange('lastweek')">Semana passada</button>
-      <button class="chip" onclick="setRange('month')">Este mês</button>
-      <button class="chip" onclick="setRange('lastmonth')">Mês passado</button>
-    </div>
-
-    <button class="btn btn-primary" id="btnScan" onclick="handleScan()">Pesquisar no calendário</button>
 
     <div id="results"></div>
   </div>
@@ -221,6 +227,9 @@
     const GRAPH_SCOPES      = ['Calendars.Read'];
 
     // ID de oportunidade: OPP-YY-NNNNNN(N) — o mesmo formato usado pelo Hub (extract_opp_numbers)
+    // true: ao abrir lê o calendário e regista logo o que fizer match (sem confirmar). false: pede confirmação.
+    const AUTO_REGISTER = true;
+
     const OPP_REGEX = /OPP-\d{2}-\d{6,7}/gi;
 
     let supabaseClient = null;
@@ -282,6 +291,14 @@
         }
       });
 
+      // O Supabase rotaciona o refresh token a cada renovação: guardar sempre o mais recente,
+      // senão ao reabrir o Outlook o token guardado já não vale e pede login outra vez.
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (session && (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN')) {
+          saveTokens(session.access_token, session.refresh_token);
+        }
+      });
+
       const { access, refresh } = loadTokens();
       if (access && refresh) {
         try {
@@ -290,6 +307,9 @@
             currentUser = data.user;
             saveTokens(data.session.access_token, data.session.refresh_token);
             initSyncView();
+          } else if (error && /fetch|network|failed to/i.test(error.message || '')) {
+            // Sem rede: manter os tokens e deixar tentar de novo, em vez de apagar a sessão
+            showAlert('loginError', 'Sem ligação ao Hub. Tenta novamente.');
           } else {
             clearTokens();
           }
@@ -306,6 +326,7 @@
     function hideAlert(id) { document.getElementById(id).classList.remove('show'); }
     function setLoading(btnId, loading, label) {
       const btn = document.getElementById(btnId);
+      if (!btn) return;
       btn.disabled = loading;
       btn.innerHTML = loading ? `<span class="spinner"></span>${label || 'A processar...'}` : label;
     }
@@ -394,7 +415,23 @@
       );
     }
 
+    function toggleUserMenu(e) {
+      e.stopPropagation();
+      const dd = document.getElementById('userDropdown');
+      const open = !dd.classList.contains('show');
+      dd.classList.toggle('show', open);
+      document.getElementById('userBtn').setAttribute('aria-expanded', String(open));
+    }
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#userBadge')) {
+        const dd = document.getElementById('userDropdown');
+        if (dd) dd.classList.remove('show');
+      }
+    });
+
     async function handleSignOut() {
+      stopAutoRefresh();
+      document.getElementById('userDropdown').classList.remove('show');
       clearTokens();
       // scope local: o signOut global revogaria também a sessão do Hub no browser
       try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch(e) {}
@@ -409,25 +446,32 @@
       showSection('sectionSync');
       document.getElementById('userBadge').style.display = 'flex';
       document.getElementById('userEmail').textContent = currentUser.email;
-      setRange('week');
+      document.getElementById('userDropdownEmail').textContent = currentUser.email;
+      handleScan();
+      startAutoRefresh();
     }
 
-    // ── Intervalo de datas ───────────────────────────────────────────────────
-    function toInputDate(d) {
-      const p = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-    }
-    function setRange(kind) {
+    // Intervalo fixo: mês atual (a pesquisa é automática, sem escolha manual)
+    function currentMonthRange() {
       const now = new Date();
-      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
-      let from, to;
-      if (kind === 'week')          { from = monday; to = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6); }
-      else if (kind === 'lastweek') { from = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7); to = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1); }
-      else if (kind === 'month')    { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth() + 1, 0); }
-      else                          { from = new Date(now.getFullYear(), now.getMonth() - 1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
-      document.getElementById('dateFrom').value = toInputDate(from);
-      document.getElementById('dateTo').value   = toInputDate(to);
+      const p = n => String(n).padStart(2, '0');
+      const fmt = d => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      return {
+        from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)),
+        to:   fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+      };
     }
+
+    // Releitura automática: de 5 em 5 minutos e quando o painel volta a ficar visível
+    let rescanTimer = null, lastScanAt = 0, scanning = false;
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      rescanTimer = setInterval(() => { if (currentUser && !document.hidden) handleScan(); }, 5 * 60 * 1000);
+    }
+    function stopAutoRefresh() { if (rescanTimer) clearInterval(rescanTimer); rescanTimer = null; }
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && currentUser && Date.now() - lastScanAt > 60 * 1000) handleScan();
+    });
 
     // ── Microsoft Graph (Nested App Auth) ────────────────────────────────────
     let msalPromise = null;
@@ -482,13 +526,10 @@
     // ── Pesquisar e fazer match com projetos ─────────────────────────────────
     async function handleScan() {
       hideAlert('syncError'); hideAlert('syncSuccess');
-      const from = document.getElementById('dateFrom').value;
-      const to   = document.getElementById('dateTo').value;
-      if (!from || !to || from > to) { showAlert('syncError', 'Escolhe um intervalo de datas válido.'); return; }
-
-      setLoading('btnScan', true, 'A ler o calendário...');
-      const results = document.getElementById('results');
-      results.innerHTML = '';
+      if (scanning) return;
+      scanning = true;
+      const { from, to } = currentMonthRange();
+      if (!scanned.length) document.getElementById('results').innerHTML = '<div class="empty">A ler o calendário...</div>';
       try {
         const raw = await fetchCalendarEvents(from, to);
         const withOpp = raw
@@ -511,10 +552,16 @@
 
         if (scanned.length) await matchProjects();
         renderResults();
+        const pending = scanned.filter(e => e.selected).length;
+        if (AUTO_REGISTER && pending > 0) await handleRegister();
       } catch (err) {
+        document.getElementById('results').innerHTML = '';
         showAlert('syncError', err.message || String(err));
+        // O consentimento Microsoft precisa de um clique do utilizador (popup): oferecer nova tentativa só em caso de erro
+        document.getElementById('syncError').insertAdjacentHTML('beforeend', ' <a href="#" class="change-link" style="color:inherit;font-weight:600;text-decoration:underline;" onclick="event.preventDefault(); handleScan();">Tentar novamente</a>');
       } finally {
-        setLoading('btnScan', false, 'Pesquisar no calendário');
+        scanning = false;
+        lastScanAt = Date.now();
       }
     }
 
@@ -549,43 +596,31 @@
     // ── Render ───────────────────────────────────────────────────────────────
     function renderResults() {
       const el = document.getElementById('results');
-      if (!scanned.length) {
-        el.innerHTML = '<div class="empty">Nenhuma marcação com ID de OPP (ex.: OPP-26-0000123) neste intervalo.</div>';
+      // Só OPPs detetadas no calendário e adicionadas a um projeto do Hub
+      const added = scanned.filter(e => e.project && e.registered);
+      if (!added.length) {
+        el.innerHTML = '<div class="empty">Nenhuma OPP do calendário adicionada este mês.</div>';
         return;
       }
-      const idx = scanned.map((e, i) => i);
-      const matched = idx.filter(i => scanned[i].project);
-      const unmatched = idx.filter(i => !scanned[i].project);
+      // Uma linha por OPP (soma das marcações do mês)
+      const byOpp = new Map();
+      added.forEach(e => {
+        const g = byOpp.get(e.opp) || { opp: e.opp, project: e.project, minutes: 0, count: 0 };
+        g.minutes += e.minutes;
+        g.count += 1;
+        byOpp.set(e.opp, g);
+      });
+      const groups = [...byOpp.values()].sort((x, y) => x.opp.localeCompare(y.opp));
 
-      const card = i => {
-        const e = scanned[i];
-        const cls = e.registered ? 'done' : (e.project ? '' : 'nomatch');
-        const badge = e.registered
-          ? `<span class="badge ok">Já registado · ${esc(e.project.name)}</span>`
-          : e.project
-            ? `<span class="badge">${esc(e.opp)} → ${esc(e.project.name)}${e.ambiguous ? ' (+ outros projetos)' : ''}</span>`
-            : `<span class="badge warn">${esc(e.opp)} · sem projeto no Hub (ou sem acesso)</span>`;
-        const note = e.allDay ? '<div class="ev-meta">Dia inteiro — ignorado</div>' : '';
-        const canSelect = e.project && !e.registered && !e.allDay;
-        return `<div class="ev ${cls}">
-          <input type="checkbox" ${e.selected ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleEvent(${i}, this.checked)">
+      el.innerHTML = groups.map(g => `
+        <div class="ev done">
           <div class="ev-body">
-            <div class="ev-subject">${esc(e.subject)}</div>
-            <div class="ev-meta">${esc(fmtWhen(e.startIso, e.endIso))}</div>
-            ${badge}${note}
+            <div class="ev-subject">${esc(g.opp)}</div>
+            <div class="ev-meta">${esc(g.project.name)}</div>
+            <div class="ev-meta">${g.count} marcaç${g.count === 1 ? 'ão' : 'ões'}</div>
           </div>
-          <div class="ev-dur">${fmtDuration(e.minutes)}</div>
-        </div>`;
-      };
-
-      el.innerHTML =
-        (matched.length ? `<div class="group-title">Com projeto (${matched.length})</div>${matched.map(card).join('')}` : '') +
-        (unmatched.length ? `<div class="group-title">Sem projeto (${unmatched.length})</div>${unmatched.map(card).join('')}` : '') +
-        `<div class="summary">
-           <div class="summary-line"><span id="selCount"></span><strong id="selTotal"></strong></div>
-           <button class="btn btn-primary" id="btnRegister" onclick="handleRegister()">Registar horas no Hub</button>
-         </div>`;
-      updateSummary();
+          <div class="ev-dur">${fmtDuration(g.minutes)}</div>
+        </div>`).join('');
     }
 
     function toggleEvent(i, checked) { scanned[i].selected = checked; updateSummary(); }
@@ -622,11 +657,8 @@
           .upsert(rows, { onConflict: 'user_id,project_id,external_key' });
         if (error) throw new Error(error.message);
 
-        const total = sel.reduce((s, e) => s + e.minutes, 0);
-        const nProjects = new Set(sel.map(e => e.project.id)).size;
         sel.forEach(e => { e.registered = true; e.selected = false; });
         renderResults();
-        showAlert('syncSuccess', `${sel.length} marcaç${sel.length === 1 ? 'ão registada' : 'ões registadas'} (${fmtDuration(total)}) em ${nProjects} projeto${nProjects === 1 ? '' : 's'}. Visível na tab Calendário.`);
       } catch (err) {
         showAlert('syncError', 'Erro ao registar: ' + (err.message || err));
         setLoading('btnRegister', false, 'Registar horas no Hub');

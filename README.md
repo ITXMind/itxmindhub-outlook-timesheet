@@ -12,7 +12,7 @@ cards (utilizador + tempo) na tab **Calendário** do projeto. Não cria registos
 - **Match OPP → projeto:** RPC `match_opps_to_projects` (via `quotes.opp_number` do projeto ou
   `project_items.opp_number`), com RLS: só projetos a que o utilizador tem acesso.
 - **Registo:** upsert em `project_calendar_events` (chave `iCalUId|início`, sem duplicados).
-- Fluxo manual: escolher intervalo → Pesquisar → rever/desmarcar → Registar.
+- Ao abrir lê o mês atual e regista automaticamente (`AUTO_REGISTER` em `taskpane/index.html`; `false` pede confirmação). A leitura é sempre automática (mês atual, de 5 em 5 minutos e ao reabrir o painel), sem pesquisa manual.
 
 ## Antes de usar
 
