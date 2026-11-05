@@ -226,12 +226,11 @@
     const GRAPH_TENANT_ID   = 'a49a409e-8c48-4d87-94bd-e104ae726d92';
     const GRAPH_SCOPES      = ['Calendars.Read'];
 
-    // ID de oportunidade: qualquer "OPP-..." (ex.: OPP-26-0000123 ou OPP-TESTE). Quem decide se é válido é o Hub:
-    // só conta se fizer match com um projeto (nº de OPP ou nome do projeto).
+    // ID de oportunidade: apenas OPP-AA-NNNNNNN (ex.: OPP-26-0000123). Nada de OPP-<texto>.
     // true: ao abrir lê o calendário e regista logo o que fizer match (sem confirmar). false: pede confirmação.
     const AUTO_REGISTER = true;
 
-    const OPP_REGEX = /OPP-[A-Z0-9]+(?:-[A-Z0-9]+)*/gi;
+    const OPP_REGEX = /OPP-\d{2}-\d{7}/i;
 
     let supabaseClient = null;
     let currentUser    = null;
@@ -516,14 +515,15 @@
       }
     }
 
-    // Lê as marcações do calendário no intervalo (UTC) e devolve só as que têm ID de OPP
+    // Pede ao Graph só as marcações do intervalo com "OPP-" no assunto (filtrado no servidor, não lê o resto do calendário)
     async function fetchCalendarEvents(fromDate, toDate) {
       const token = await getGraphToken();
       const start = new Date(fromDate + 'T00:00:00').toISOString();
       const end   = new Date(new Date(toDate + 'T00:00:00').getTime() + 86400000).toISOString();
       let url = 'https://graph.microsoft.com/v1.0/me/calendarView'
         + `?startDateTime=${encodeURIComponent(start)}&endDateTime=${encodeURIComponent(end)}`
-        + '&$select=id,iCalUId,subject,start,end,isAllDay,isCancelled,location,bodyPreview&$orderby=start/dateTime&$top=100';
+        + `&$filter=${encodeURIComponent("contains(subject,'OPP-')")}`
+        + '&$select=id,iCalUId,subject,start,end,isAllDay,isCancelled&$orderby=start/dateTime&$top=100';
       const all = [];
       while (url && all.length < 2000) {
         const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token, Prefer: 'outlook.timezone="UTC"' } });
@@ -536,12 +536,8 @@
     }
 
     function extractOpp(ev) {
-      // Assunto primeiro (é onde o ID deve estar); depois local e corpo da convocatória
-      for (const text of [ev.subject, ev.location && ev.location.displayName, ev.bodyPreview]) {
-        const m = text && text.match(OPP_REGEX);
-        if (m) return m[0].toUpperCase();
-      }
-      return null;
+      const m = (ev.subject || '').match(OPP_REGEX);
+      return m ? m[0].toUpperCase() : null;
     }
 
     // ── Pesquisar e fazer match com projetos ─────────────────────────────────
@@ -624,9 +620,9 @@
         // Diagnóstico (só quando não há nada adicionado): o que foi lido e porque não entrou
         const unmatched = [...new Set(scanned.filter(e => !e.project).map(e => e.opp))];
         const detail = lastScanTotal === 0
-          ? 'Nenhuma marcação do calendário lida neste mês.'
+          ? 'Nenhuma marcação com OPP no assunto neste mês.'
           : scanned.length === 0
-            ? `${lastScanTotal} marcações lidas, nenhuma com ID de OPP no assunto.`
+            ? 'Há marcações com "OPP-" no assunto, mas sem um ID válido (OPP-AA-NNNNNNN).'
             : unmatched.length
               ? `Detetado no calendário, mas sem projeto no Hub (ou sem acesso): ${unmatched.map(esc).join(', ')}.`
               : 'Detetado no calendário, mas ainda não registado.';

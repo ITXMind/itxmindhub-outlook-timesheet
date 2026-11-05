@@ -1,7 +1,7 @@
 # Hub – Horas do Calendário (Outlook add-in)
 
 Lê as marcações do calendário do utilizador, filtra as que contêm um ID de oportunidade
-(`OPP-…`, ex.: `OPP-26-0000123` ou `OPP-TESTE`), faz match com projetos do ITXMind Hub e regista-as para aparecerem como
+(`OPP-AA-NNNNNNN`, ex.: `OPP-26-0000123`), faz match com projetos do ITXMind Hub e regista-as para aparecerem como
 cards (utilizador + tempo) na tab **Calendário** do projeto. Não cria registos de tempo em tarefas.
 
 ## Como funciona
