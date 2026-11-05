@@ -339,11 +339,24 @@
             return;
           }
           const dialog = result.value;
+          let handled = false;
+          const HANDOFF_KEY = 'hub_timesheet_auth_handoff';
+          try { localStorage.removeItem(HANDOFF_KEY); } catch (e) {}
 
-          dialog.addEventHandler(Office.EventType.DialogMessageReceived, async arg => {
-            dialog.close();
+          // Canal alternativo: se a mensagem do dialog não chegar, o dialog deixa os tokens em localStorage
+          const poll = setInterval(() => {
+            let raw = null;
+            try { raw = localStorage.getItem(HANDOFF_KEY); } catch (e) {}
+            if (raw) { try { localStorage.removeItem(HANDOFF_KEY); } catch (e) {} onAuth(raw); }
+          }, 700);
+
+          async function onAuth(raw) {
+            if (handled) return;
+            handled = true;
+            clearInterval(poll);
+            try { dialog.close(); } catch (e) {}
             let msg;
-            try { msg = JSON.parse(arg.message); } catch (e) {
+            try { msg = JSON.parse(raw); } catch (e) {
               showAlert('loginError', 'Erro ao processar resposta. Tenta novamente.');
               setLoading('btnLogin', false, 'Iniciar Sessão');
               return;
@@ -353,7 +366,8 @@
                 access_token: msg.access_token, refresh_token: msg.refresh_token,
               });
               if (error || !data.session) {
-                showAlert('loginError', 'Sessão inválida. Tenta novamente.');
+                console.error('setSession falhou', error);
+                showAlert('loginError', 'Sessão inválida' + (error ? ' (' + (error.code || error.name || '') + ': ' + error.message + ')' : ' (sem sessão devolvida)') + '. Tenta novamente.');
                 setLoading('btnLogin', false, 'Iniciar Sessão');
                 return;
               }
@@ -364,10 +378,14 @@
               showAlert('loginError', 'Login cancelado. Tenta novamente.');
               setLoading('btnLogin', false, 'Iniciar Sessão');
             }
-          });
+          }
+
+          dialog.addEventHandler(Office.EventType.DialogMessageReceived, arg => onAuth(arg.message));
 
           // 12006 = utilizador fechou o dialog manualmente
           dialog.addEventHandler(Office.EventType.DialogEventReceived, arg => {
+            clearInterval(poll);
+            if (handled) return;
             setLoading('btnLogin', false, 'Iniciar Sessão');
             if (arg.error !== 12006) showAlert('loginError', 'Janela fechada inesperadamente. Tenta novamente.');
           });

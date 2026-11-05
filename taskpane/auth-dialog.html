@@ -95,11 +95,20 @@
 
       if (accessToken) {
         document.getElementById('spinnerLabel').textContent = 'Login efetuado! A fechar...';
-        Office.context.ui.messageParent(JSON.stringify({
+        const payload = JSON.stringify({
           type: 'AUTH_SUCCESS',
           access_token: accessToken,
           refresh_token: refreshToken || '',
-        }));
+        });
+        // Canal alternativo: o painel também lê isto (mesma origem) caso a mensagem se perca.
+        try { localStorage.setItem('hub_timesheet_auth_handoff', payload); } catch (e) {}
+        // Depois de navegar para o Hub e voltar, a 1.ª mensagem pode perder-se: reenviar até o painel fechar o dialog.
+        let tries = 0;
+        const send = () => {
+          try { Office.context.ui.messageParent(payload); } catch (e) {}
+          if (++tries < 15) setTimeout(send, 600);
+        };
+        send();
       } else {
         document.getElementById('spinnerLabel').textContent = 'A redirecionar para o Hub...';
         const dialogOrigin = encodeURIComponent(window.location.href.split('#')[0]);
