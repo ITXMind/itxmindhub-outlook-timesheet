@@ -347,10 +347,10 @@
           const poll = setInterval(() => {
             let raw = null;
             try { raw = localStorage.getItem(HANDOFF_KEY); } catch (e) {}
-            if (raw) { try { localStorage.removeItem(HANDOFF_KEY); } catch (e) {} onAuth(raw); }
+            if (raw) { try { localStorage.removeItem(HANDOFF_KEY); } catch (e) {} onAuth(raw, 'storage'); }
           }, 700);
 
-          async function onAuth(raw) {
+          async function onAuth(raw, via) {
             if (handled) return;
             handled = true;
             clearInterval(poll);
@@ -367,7 +367,8 @@
               });
               if (error || !data.session) {
                 console.error('setSession falhou', error);
-                showAlert('loginError', 'Sessão inválida' + (error ? ' (' + (error.code || error.name || '') + ': ' + error.message + ')' : ' (sem sessão devolvida)') + '. Tenta novamente.');
+                const diag = ' [via ' + via + ', access=' + (msg.access_token || '').length + ', refresh=' + (msg.refresh_token || '').length + ']';
+                showAlert('loginError', 'Sessão inválida' + (error ? ' (' + (error.code || error.name || '') + ': ' + error.message + ')' : ' (sem sessão devolvida)') + diag + '. Tenta novamente.');
                 setLoading('btnLogin', false, 'Iniciar Sessão');
                 return;
               }
@@ -380,7 +381,7 @@
             }
           }
 
-          dialog.addEventHandler(Office.EventType.DialogMessageReceived, arg => onAuth(arg.message));
+          dialog.addEventHandler(Office.EventType.DialogMessageReceived, arg => onAuth(arg.message, 'dialog'));
 
           // 12006 = utilizador fechou o dialog manualmente
           dialog.addEventHandler(Office.EventType.DialogEventReceived, arg => {
