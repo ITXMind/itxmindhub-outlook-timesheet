@@ -5,8 +5,25 @@ oportunidade (`OPP-AA-NNNNNNN`, ex.: `OPP-26-0000123`), faz match com projetos d
 para aparecerem como cards na tab **Calendário** do projeto (título da reunião, hora, colaborador e duração).
 **Não cria registos de tempo em tarefas.**
 
-O painel do add-in mostra apenas a lista das OPPs detetadas e adicionadas ao calendário do Hub
-(OPP, projeto, nº de marcações e duração total). Não há pesquisa nem escolha de datas manual.
+As marcações chegam ao Hub **sem ninguém abrir o add-in**: uma sincronização no servidor (de 15 em 15 minutos)
+lê os calendários de todos os utilizadores do Hub. O add-in é opcional e serve para ver a lista das OPPs
+detetadas (OPP, projeto, nº de marcações e duração total) e forçar uma leitura imediata. Não há pesquisa nem
+escolha de datas manual.
+
+## Sincronização automática (servidor)
+
+- **Função** `sync-outlook-calendar` (repo `itxmind-hub`), agendada por `pg_cron` de 15 em 15 minutos.
+- Usa o Microsoft Graph com permissão de **aplicação** `Calendars.Read` (client credentials) e lê o calendário de
+  cada utilizador do Hub (pelo email do perfil), do mês anterior até 3 meses à frente. Pede só as marcações com
+  `OPP-` no assunto (`contains(subject,'OPP-')`).
+- Aplica as mesmas regras do add-in: ID `OPP-\d{2}-\d{7}` no assunto, match com o projeto (orçamento do projeto
+  ou itens importados), registo só onde o utilizador é membro do projeto (ou admin), sem duplicados
+  (`iCalUId|início`).
+- **Limpeza:** marcações apagadas, canceladas, sem OPP no assunto ou com a OPP trocada de projeto são removidas do
+  Hub no ciclo seguinte (só dentro da janela e só quando a leitura desse utilizador correu toda bem).
+- Utilizadores sem caixa de correio Exchange Online ou bloqueados por política de acesso são ignorados.
+- Teste manual de um utilizador (resposta com o detalhe):
+  `curl -X POST <SUPABASE_URL>/functions/v1/sync-outlook-calendar -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -d '{"email":"nome@itxmind.com"}'`
 
 ## Como funciona
 
@@ -20,9 +37,8 @@ O painel do add-in mostra apenas a lista das OPPs detetadas e adicionadas ao cal
   não o calendário todo.
 - **Reconhecimento do ID:** apenas `OPP-\d{2}-\d{7}`, só no assunto. Variantes como `OPP-TESTE` ou IDs com
   outro número de dígitos são ignoradas.
-- **Match OPP → projeto:** RPC `match_opps_to_projects` (via `quotes.opp_number` do projeto,
-  `project_items.opp_number`, ou nome do projeto igual ao ID / começado por "ID "), com RLS: só projetos a que
-  o utilizador tem acesso.
+- **Match OPP → projeto:** RPC `match_opps_to_projects` (via `quotes.opp_number` do projeto ou
+  `project_items.opp_number`), com RLS: só projetos a que o utilizador tem acesso.
 - **Registo:** upsert em `project_calendar_events` (chave `iCalUId|início`, sem duplicados).
 - **Atualização:** ao abrir lê o mês atual e regista automaticamente (`AUTO_REGISTER` em `taskpane/index.html`;
   `false` pede confirmação). Repete de 5 em 5 minutos e ao reabrir o painel.
@@ -34,8 +50,10 @@ O painel do add-in mostra apenas a lista das OPPs detetadas e adicionadas ao cal
 
 1. **Hub (repo `itxmind-hub`):**
    - aplicar as migrações `20261105120000_project_calendar_events.sql` e
-     `20261105130000_match_opps_by_project_name.sql` (`supabase db push`);
-   - publicar a função: `supabase functions deploy outlook-addin-session`;
+     `20261105140000_sync_outlook_calendar_cron.sql` (`supabase db push`);
+   - publicar as funções: `supabase functions deploy outlook-addin-session sync-outlook-calendar`;
+   - definir os segredos da sincronização (ver passo 2):
+     `supabase secrets set OUTLOOK_SYNC_TENANT_ID=… OUTLOOK_SYNC_CLIENT_ID=… OUTLOOK_SYNC_CLIENT_SECRET=…`;
    - fazer deploy do frontend (`CalendarView.tsx`, `useProjectCalendarEvents.ts`, `OutlookAuth.tsx`,
      `AuthContext.tsx`, `MicrosoftCallback.tsx`, `LoginForm.tsx`). A página `OutlookAuth.tsx` só entrega a sessão
      a callbacks da lista `ALLOWED_ADDIN_CALLBACKS`; o URL deste add-in tem de lá estar.
@@ -43,6 +61,11 @@ O painel do add-in mostra apenas a lista das OPPs detetadas e adicionadas ao cal
    concedido (sem isso aparece "Necessita de aprovação do administrador"), redirect URI
    `brk-multihub://itxmind.github.io`, e pré-autorizar o Outlook. Colocar o Client ID em `GRAPH_CLIENT_ID`
    (`taskpane/index.html`) e no `<WebApplicationInfo>` do `manifest.xml`.
+   **Sincronização automática:** na mesma app (ou numa nova) adicionar a permissão de **Aplicação**
+   `Calendars.Read` (Microsoft Graph) com consentimento de administrador, e criar um *client secret*
+   (Certificates & secrets). O tenant, o client ID e o secret vão para os segredos `OUTLOOK_SYNC_*` acima.
+   Esta permissão dá acesso a todas as caixas de correio: restringir com uma *Application Access Policy* do
+   Exchange (`New-ApplicationAccessPolicy`) a um grupo de segurança com os utilizadores do Hub.
 3. **Alojamento:** publicar esta pasta em HTTPS (GitHub Pages) e ajustar o URL base
    (`itxmind.github.io/itxmindhub-outlook-timesheet`) no `manifest.xml` e em `HUB_LOGIN_URL` (`taskpane/index.html`).
 4. Instalar o `manifest.xml` no Outlook (Aplicações → Adicionar suplementos personalizados).
