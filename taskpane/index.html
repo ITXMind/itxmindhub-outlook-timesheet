@@ -396,7 +396,8 @@
 
     async function handleSignOut() {
       clearTokens();
-      try { await supabaseClient.auth.signOut(); } catch(e) {}
+      // scope local: o signOut global revogaria também a sessão do Hub no browser
+      try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch(e) {}
       currentUser = null; scanned = [];
       document.getElementById('userBadge').style.display = 'none';
       document.getElementById('results').innerHTML = '';
