@@ -464,7 +464,7 @@
     }
 
     // Releitura automática: de 5 em 5 minutos e quando o painel volta a ficar visível
-    let rescanTimer = null, lastScanAt = 0, scanning = false;
+    let rescanTimer = null, lastScanAt = 0, scanning = false, lastScanTotal = 0;
     function startAutoRefresh() {
       stopAutoRefresh();
       rescanTimer = setInterval(() => { if (currentUser && !document.hidden) handleScan(); }, 5 * 60 * 1000);
@@ -553,6 +553,7 @@
       if (!scanned.length) document.getElementById('results').innerHTML = '<div class="empty">A ler o calendário...</div>';
       try {
         const raw = await fetchCalendarEvents(from, to);
+        lastScanTotal = raw.length;
         const withOpp = raw
           .filter(e => !e.isCancelled)
           .map(e => ({ ev: e, opp: extractOpp(e) }))
@@ -620,7 +621,16 @@
       // Só OPPs detetadas no calendário e adicionadas a um projeto do Hub
       const added = scanned.filter(e => e.project && e.registered);
       if (!added.length) {
-        el.innerHTML = '<div class="empty">Nenhuma OPP do calendário adicionada este mês.</div>';
+        // Diagnóstico (só quando não há nada adicionado): o que foi lido e porque não entrou
+        const unmatched = [...new Set(scanned.filter(e => !e.project).map(e => e.opp))];
+        const detail = lastScanTotal === 0
+          ? 'Nenhuma marcação do calendário lida neste mês.'
+          : scanned.length === 0
+            ? `${lastScanTotal} marcações lidas, nenhuma com ID de OPP no assunto.`
+            : unmatched.length
+              ? `Detetado no calendário, mas sem projeto no Hub (ou sem acesso): ${unmatched.map(esc).join(', ')}.`
+              : 'Detetado no calendário, mas ainda não registado.';
+        el.innerHTML = `<div class="empty">Nenhuma OPP do calendário adicionada este mês.<div style="margin-top:8px;font-size:11px;">${detail}</div></div>`;
         return;
       }
       // Uma linha por OPP (soma das marcações do mês)
