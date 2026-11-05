@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hub – A autenticar...</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary:    #1a1f36;
+      --accent:     #00c5db;
+      --text:       #1a1f36;
+      --text-muted: #6b7280;
+      --border:     #e4e7ed;
+      --bg:         #f7f8fa;
+      --bg-card:    #ffffff;
+      --radius:     10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: var(--bg);
+    }
+    .card {
+      background: var(--bg-card); border-radius: 16px; padding: 40px 32px;
+      box-shadow: 0 8px 32px rgba(26,31,54,.10); text-align: center;
+      max-width: 360px; width: 100%; margin: 20px;
+    }
+    .logo {
+      width: 72px; height: 72px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .logo img { width: 72px; height: 72px; object-fit: contain; }
+    h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 8px;
+    }
+    p { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 28px; }
+    .spinner-wrap {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; color: var(--text-muted); font-size: 13px;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error {
+      background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+      border-radius: var(--radius); padding: 12px; font-size: 13px;
+      margin-top: 16px; display: none;
+    }
+    .divider {
+      height: 1px; background: var(--border); margin: 24px 0;
+    }
+    .footer {
+      font-size: 11px; color: var(--text-muted); letter-spacing: .02em;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <img src="assets/logo.jpg" alt="ITXMind" />
+    </div>
+    <h1>Hub</h1>
+    <p>A autenticar com a sua conta ITXMind...</p>
+    <div class="spinner-wrap">
+      <div class="spinner"></div>
+      <span id="spinnerLabel">A aguardar autenticação</span>
+    </div>
+    <div class="error" id="errorBox"></div>
+    <div class="divider"></div>
+    <div class="footer">ITXMind Hub · Horas do Calendário</div>
+  </div>
+
+  <script>
+    function showError(msg) {
+      document.querySelector('.spinner-wrap').style.display = 'none';
+      const el = document.getElementById('errorBox');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    Office.onReady(() => {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const accessToken  = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (accessToken) {
+        document.getElementById('spinnerLabel').textContent = 'Login efetuado! A fechar...';
+        Office.context.ui.messageParent(JSON.stringify({
+          type: 'AUTH_SUCCESS',
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        }));
+      } else {
+        document.getElementById('spinnerLabel').textContent = 'A redirecionar para o Hub...';
+        const dialogOrigin = encodeURIComponent(window.location.href.split('#')[0]);
+        window.location.href = 'https://hub.itxmind.com/auth/outlook?dialog_callback=' + dialogOrigin;
+      }
+    });
+  </script>
+</body>
+</html>

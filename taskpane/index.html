@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hub – Horas do Calendário</title>
+
+  <!-- Office.js MUST be loaded before anything else -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <!-- MSAL (Nested App Auth) para ler o calendário via Microsoft Graph -->
+  <script src="https://alcdn.msauth.net/browser/3.28.1/js/msal-browser.min.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary:       #1a1f36;
+      --primary-hover: #13172a;
+      --accent:        #00c5db;
+      --danger:        #dc2626;
+      --success:       #16a34a;
+      --warn:          #b45309;
+      --text:          #1a1f36;
+      --text-muted:    #6b7280;
+      --border:        #e4e7ed;
+      --bg:            #f7f8fa;
+      --bg-card:       #ffffff;
+      --radius:        10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px; color: var(--text);
+      background: var(--bg); padding: 16px; min-height: 100vh;
+    }
+
+    .header {
+      display: flex; align-items: center; gap: 10px;
+      padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 18px;
+    }
+    .logo {
+      width: 34px; height: 34px; background: #fff; border: 1px solid var(--border);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .logo img { width: 20px; height: 20px; object-fit: contain; }
+    .header-text h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 15px; font-weight: 800; line-height: 1.2;
+    }
+    .header-text p { font-size: 11px; color: var(--text-muted); }
+    .user-badge {
+      margin-left: auto; font-size: 11px; color: var(--text-muted);
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+    }
+    .user-badge:hover { color: var(--text); }
+    .user-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .field { margin-bottom: 12px; }
+    label.lbl {
+      display: block; font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px;
+    }
+    input[type="date"] {
+      width: 100%; padding: 9px 10px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 13px; font-family: inherit; color: var(--text);
+      background: var(--bg-card); outline: none; color-scheme: light;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,197,219,.12); }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; min-width: 0; }
+
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .chip {
+      padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+      cursor: pointer; font-family: inherit;
+    }
+    .chip:hover { border-color: var(--accent); color: #0e7490; }
+
+    .btn {
+      display: block; width: 100%; padding: 11px; border: none; border-radius: var(--radius);
+      font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+      transition: background .15s, opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.99); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn:disabled { opacity: .55; cursor: default; transform: none; }
+    .btn-ghost { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); margin-top: 8px; }
+
+    .alert {
+      padding: 10px 12px; border-radius: var(--radius);
+      font-size: 13px; margin-bottom: 14px; display: none; line-height: 1.45;
+    }
+    .alert.show { display: block; }
+    .alert-error   { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: var(--success); border: 1px solid #bbf7d0; }
+    .alert-info    { background: #f0f9ff; color: #0e7490; border: 1px solid #bae6fd; }
+
+    .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      display: inline-block; vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Resultados ── */
+    .group-title {
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 6px;
+    }
+    .ev {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent); border-radius: var(--radius);
+      padding: 10px 12px; margin-bottom: 8px;
+    }
+    .ev.nomatch { border-left-color: var(--warn); }
+    .ev.done { border-left-color: var(--success); opacity: .75; }
+    .ev input[type="checkbox"] { margin-top: 3px; accent-color: var(--primary); width: 15px; height: 15px; }
+    .ev-body { flex: 1; min-width: 0; }
+    .ev-subject { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+    .ev-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .ev-dur { font-weight: 700; font-size: 13px; color: var(--primary); white-space: nowrap; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: rgba(0,197,219,.12); color: #0e7490; margin-top: 4px;
+    }
+    .badge.warn { background: #fffbeb; color: var(--warn); }
+    .badge.ok { background: #f0fdf4; color: var(--success); }
+    .summary {
+      position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 4px; margin-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .summary-line { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+    .summary-line strong { color: var(--text); }
+    .empty { padding: 18px 8px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+    footer {
+      margin-top: 24px; text-align: center; font-size: 11px; color: var(--text-muted);
+      padding-top: 14px; border-top: 1px solid var(--border); letter-spacing: .02em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo"><img src="assets/logo.jpg" alt="ITXMind"></div>
+    <div class="header-text">
+      <h1>ITXMind Hub</h1>
+      <p>Horas do calendário por OPP</p>
+    </div>
+    <div class="user-badge" id="userBadge" style="display:none" onclick="handleSignOut()" title="Terminar sessão">
+      <div class="dot"></div>
+      <span id="userEmail">–</span>
+    </div>
+  </div>
+
+  <!-- ── LOGIN ── -->
+  <div class="section active" id="sectionLogin">
+    <div class="alert alert-error" id="loginError"></div>
+    <div style="text-align:center;padding:20px 0 28px;">
+      <div style="width:72px;height:72px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+        <img src="assets/logo.jpg" style="width:72px;height:72px;object-fit:contain;" alt="ITXMind">
+      </div>
+      <p style="font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;margin-bottom:6px;">ITXMind Hub</p>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.5;">
+        Inicie sessão para registar as horas das suas reuniões nos projetos.
+      </p>
+    </div>
+    <button class="btn btn-primary" id="btnLogin" onclick="handleLogin()">Iniciar Sessão</button>
+  </div>
+
+  <!-- ── SYNC ── -->
+  <div class="section" id="sectionSync">
+    <div class="alert alert-error"   id="syncError"></div>
+    <div class="alert alert-success" id="syncSuccess"></div>
+
+    <div class="row field">
+      <div>
+        <label class="lbl" for="dateFrom">De</label>
+        <input type="date" id="dateFrom" />
+      </div>
+      <div>
+        <label class="lbl" for="dateTo">Até</label>
+        <input type="date" id="dateTo" />
+      </div>
+    </div>
+    <div class="chips">
+      <button class="chip" onclick="setRange('week')">Esta semana</button>
+      <button class="chip" onclick="setRange('lastweek')">Semana passada</button>
+      <button class="chip" onclick="setRange('month')">Este mês</button>
+      <button class="chip" onclick="setRange('lastmonth')">Mês passado</button>
+    </div>
+
+    <button class="btn btn-primary" id="btnScan" onclick="handleScan()">Pesquisar no calendário</button>
+
+    <div id="results"></div>
+  </div>
+
+  <footer>ITXMind Hub · Horas do Calendário</footer>
+
+  <script>
+    // ── Configuração ─────────────────────────────────────────────────────────
+    const SUPABASE_URL      = 'https://oguddaopsphkvjnqrkmg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ndWRkYW9wc3Boa3ZqbnFya21nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDczMzEsImV4cCI6MjA4MzUyMzMzMX0.sQ1MKsUQ-y0_G0seSxBCIkldquvHbU0HTKXbDwjaGCk';
+    const HUB_LOGIN_URL     = 'https://itxmind.github.io/Outlook-Timesheet-Addin/taskpane/auth-dialog.html';
+
+    // TODO: Application (client) ID do registo no Entra ID (SPA, permissão delegada Calendars.Read).
+    const GRAPH_CLIENT_ID   = '4e460ded-8000-45a0-93e4-c00785aea25e';
+    // TODO: Directory (tenant) ID — a app é single-tenant, por isso não serve 'common'.
+    const GRAPH_TENANT_ID   = 'a49a409e-8c48-4d87-94bd-e104ae726d92';
+    const GRAPH_SCOPES      = ['Calendars.Read'];
+
+    // ID de oportunidade: OPP-YY-NNNNNN(N) — o mesmo formato usado pelo Hub (extract_opp_numbers)
+    const OPP_REGEX = /OPP-\d{2}-\d{6,7}/gi;
+
+    let supabaseClient = null;
+    let currentUser    = null;
+    let scanned        = []; // eventos listados no ecrã
+
+    const TOKEN_KEY   = 'hub_timesheet_access_token';
+    const REFRESH_KEY = 'hub_timesheet_refresh_token';
+
+    // ── Tokens (igual ao add-in de anexos: RoamingSettings + localStorage) ────
+    function saveTokens(accessToken, refreshToken) {
+      try {
+        if (Office.context.roamingSettings) {
+          Office.context.roamingSettings.set(TOKEN_KEY, accessToken);
+          Office.context.roamingSettings.set(REFRESH_KEY, refreshToken);
+          Office.context.roamingSettings.saveAsync();
+        }
+      } catch(e) {}
+      try { localStorage.setItem(TOKEN_KEY, accessToken); } catch(e) {}
+      try { localStorage.setItem(REFRESH_KEY, refreshToken); } catch(e) {}
+    }
+    function loadTokens() {
+      let access = null, refresh = null;
+      try {
+        if (Office.context.roamingSettings) {
+          access  = Office.context.roamingSettings.get(TOKEN_KEY);
+          refresh = Office.context.roamingSettings.get(REFRESH_KEY);
+        }
+      } catch(e) {}
+      if (!access) {
+        try { access  = localStorage.getItem(TOKEN_KEY); } catch(e) {}
+        try { refresh = localStorage.getItem(REFRESH_KEY); } catch(e) {}
+      }
+      return { access, refresh };
+    }
+    function clearTokens() {
+      try {
+        if (Office.context.roamingSettings) {
+          Office.context.roamingSettings.remove(TOKEN_KEY);
+          Office.context.roamingSettings.remove(REFRESH_KEY);
+          Office.context.roamingSettings.saveAsync();
+        }
+      } catch(e) {}
+      try { localStorage.removeItem(TOKEN_KEY); } catch(e) {}
+      try { localStorage.removeItem(REFRESH_KEY); } catch(e) {}
+    }
+
+    // ── Office init ──────────────────────────────────────────────────────────
+    Office.onReady(async () => {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          storage: {
+            getItem:    k => { try { return localStorage.getItem(k); } catch(e) { return null; } },
+            setItem:    (k, v) => { try { localStorage.setItem(k, v); } catch(e) {} },
+            removeItem: k => { try { localStorage.removeItem(k); } catch(e) {} },
+          },
+          persistSession: true,
+          autoRefreshToken: true,
+        }
+      });
+
+      const { access, refresh } = loadTokens();
+      if (access && refresh) {
+        try {
+          const { data, error } = await supabaseClient.auth.setSession({ access_token: access, refresh_token: refresh });
+          if (!error && data.session) {
+            currentUser = data.user;
+            saveTokens(data.session.access_token, data.session.refresh_token);
+            initSyncView();
+          } else {
+            clearTokens();
+          }
+        } catch(e) { clearTokens(); }
+      }
+    });
+
+    // ── UI helpers ───────────────────────────────────────────────────────────
+    function showSection(id) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+    function showAlert(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.classList.add('show'); }
+    function hideAlert(id) { document.getElementById(id).classList.remove('show'); }
+    function setLoading(btnId, loading, label) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.innerHTML = loading ? `<span class="spinner"></span>${label || 'A processar...'}` : label;
+    }
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+    function fmtDuration(min) {
+      const h = Math.floor(min / 60), m = min % 60;
+      if (h === 0) return `${m}min`;
+      return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`;
+    }
+    function fmtWhen(startIso, endIso) {
+      const s = new Date(startIso), e = new Date(endIso);
+      const d = s.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+      const t = { hour: '2-digit', minute: '2-digit' };
+      return `${d} · ${s.toLocaleTimeString('pt-PT', t)}–${e.toLocaleTimeString('pt-PT', t)}`;
+    }
+
+    // ── Auth (mesmo método do add-in de anexos: dialog → hub.itxmind.com/auth/outlook) ──
+    function handleLogin() {
+      hideAlert('loginError');
+      setLoading('btnLogin', true, 'A abrir o Hub...');
+
+      Office.context.ui.displayDialogAsync(
+        HUB_LOGIN_URL,
+        { height: 80, width: 50, promptBeforeOpen: false },
+        result => {
+          if (result.status === Office.AsyncResultStatus.Failed) {
+            showAlert('loginError', 'Erro ao abrir o Hub: ' + result.error.message);
+            setLoading('btnLogin', false, 'Iniciar Sessão');
+            return;
+          }
+          const dialog = result.value;
+
+          dialog.addEventHandler(Office.EventType.DialogMessageReceived, async arg => {
+            dialog.close();
+            let msg;
+            try { msg = JSON.parse(arg.message); } catch (e) {
+              showAlert('loginError', 'Erro ao processar resposta. Tenta novamente.');
+              setLoading('btnLogin', false, 'Iniciar Sessão');
+              return;
+            }
+            if (msg.type === 'AUTH_SUCCESS' && msg.access_token) {
+              const { data, error } = await supabaseClient.auth.setSession({
+                access_token: msg.access_token, refresh_token: msg.refresh_token,
+              });
+              if (error || !data.session) {
+                showAlert('loginError', 'Sessão inválida. Tenta novamente.');
+                setLoading('btnLogin', false, 'Iniciar Sessão');
+                return;
+              }
+              currentUser = data.user;
+              saveTokens(data.session.access_token, data.session.refresh_token);
+              initSyncView();
+            } else {
+              showAlert('loginError', 'Login cancelado. Tenta novamente.');
+              setLoading('btnLogin', false, 'Iniciar Sessão');
+            }
+          });
+
+          // 12006 = utilizador fechou o dialog manualmente
+          dialog.addEventHandler(Office.EventType.DialogEventReceived, arg => {
+            setLoading('btnLogin', false, 'Iniciar Sessão');
+            if (arg.error !== 12006) showAlert('loginError', 'Janela fechada inesperadamente. Tenta novamente.');
+          });
+        }
+      );
+    }
+
+    async function handleSignOut() {
+      clearTokens();
+      try { await supabaseClient.auth.signOut(); } catch(e) {}
+      currentUser = null; scanned = [];
+      document.getElementById('userBadge').style.display = 'none';
+      document.getElementById('results').innerHTML = '';
+      showSection('sectionLogin');
+      setLoading('btnLogin', false, 'Iniciar Sessão');
+    }
+
+    function initSyncView() {
+      showSection('sectionSync');
+      document.getElementById('userBadge').style.display = 'flex';
+      document.getElementById('userEmail').textContent = currentUser.email;
+      setRange('week');
+    }
+
+    // ── Intervalo de datas ───────────────────────────────────────────────────
+    function toInputDate(d) {
+      const p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+    function setRange(kind) {
+      const now = new Date();
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+      let from, to;
+      if (kind === 'week')          { from = monday; to = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6); }
+      else if (kind === 'lastweek') { from = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7); to = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1); }
+      else if (kind === 'month')    { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth() + 1, 0); }
+      else                          { from = new Date(now.getFullYear(), now.getMonth() - 1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+      document.getElementById('dateFrom').value = toInputDate(from);
+      document.getElementById('dateTo').value   = toInputDate(to);
+    }
+
+    // ── Microsoft Graph (Nested App Auth) ────────────────────────────────────
+    let msalPromise = null;
+    function getMsal() {
+      if (!msalPromise) {
+        if (!GRAPH_CLIENT_ID || GRAPH_CLIENT_ID.startsWith('0000')) {
+          return Promise.reject(new Error('Falta configurar o Client ID do Entra ID (GRAPH_CLIENT_ID em taskpane/index.html). Ver README.'));
+        }
+        msalPromise = msal.createNestablePublicClientApplication({
+          auth: { clientId: GRAPH_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + GRAPH_TENANT_ID },
+        });
+      }
+      return msalPromise;
+    }
+    async function getGraphToken() {
+      const pca = await getMsal();
+      try {
+        return (await pca.acquireTokenSilent({ scopes: GRAPH_SCOPES })).accessToken;
+      } catch (e) {
+        return (await pca.acquireTokenPopup({ scopes: GRAPH_SCOPES })).accessToken;
+      }
+    }
+
+    // Lê as marcações do calendário no intervalo (UTC) e devolve só as que têm ID de OPP
+    async function fetchCalendarEvents(fromDate, toDate) {
+      const token = await getGraphToken();
+      const start = new Date(fromDate + 'T00:00:00').toISOString();
+      const end   = new Date(new Date(toDate + 'T00:00:00').getTime() + 86400000).toISOString();
+      let url = 'https://graph.microsoft.com/v1.0/me/calendarView'
+        + `?startDateTime=${encodeURIComponent(start)}&endDateTime=${encodeURIComponent(end)}`
+        + '&$select=id,iCalUId,subject,start,end,isAllDay,isCancelled,location,bodyPreview&$orderby=start/dateTime&$top=100';
+      const all = [];
+      while (url && all.length < 2000) {
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token, Prefer: 'outlook.timezone="UTC"' } });
+        if (!res.ok) throw new Error('Graph ' + res.status + ': ' + (await res.text()).slice(0, 200));
+        const json = await res.json();
+        all.push(...(json.value || []));
+        url = json['@odata.nextLink'];
+      }
+      return all;
+    }
+
+    function extractOpp(ev) {
+      // Assunto primeiro (é onde o ID deve estar); depois local e corpo da convocatória
+      for (const text of [ev.subject, ev.location && ev.location.displayName, ev.bodyPreview]) {
+        const m = text && text.match(OPP_REGEX);
+        if (m) return m[0].toUpperCase();
+      }
+      return null;
+    }
+
+    // ── Pesquisar e fazer match com projetos ─────────────────────────────────
+    async function handleScan() {
+      hideAlert('syncError'); hideAlert('syncSuccess');
+      const from = document.getElementById('dateFrom').value;
+      const to   = document.getElementById('dateTo').value;
+      if (!from || !to || from > to) { showAlert('syncError', 'Escolhe um intervalo de datas válido.'); return; }
+
+      setLoading('btnScan', true, 'A ler o calendário...');
+      const results = document.getElementById('results');
+      results.innerHTML = '';
+      try {
+        const raw = await fetchCalendarEvents(from, to);
+        const withOpp = raw
+          .filter(e => !e.isCancelled)
+          .map(e => ({ ev: e, opp: extractOpp(e) }))
+          .filter(x => x.opp);
+
+        scanned = withOpp.map(({ ev, opp }) => {
+          const startIso = ev.start.dateTime.replace(/(\.\d+)?$/, '') + 'Z';
+          const endIso   = ev.end.dateTime.replace(/(\.\d+)?$/, '') + 'Z';
+          const minutes  = Math.round((new Date(endIso) - new Date(startIso)) / 60000);
+          return {
+            key: `${ev.iCalUId || ev.id}|${startIso}`,
+            subject: ev.subject || '(sem assunto)',
+            opp, startIso, endIso, minutes,
+            allDay: !!ev.isAllDay,
+            project: null, registered: false, selected: false,
+          };
+        });
+
+        if (scanned.length) await matchProjects();
+        renderResults();
+      } catch (err) {
+        showAlert('syncError', err.message || String(err));
+      } finally {
+        setLoading('btnScan', false, 'Pesquisar no calendário');
+      }
+    }
+
+    async function matchProjects() {
+      const opps = [...new Set(scanned.map(e => e.opp))];
+      const { data, error } = await supabaseClient.rpc('match_opps_to_projects', { p_opp_numbers: opps });
+      if (error) throw new Error('Erro ao procurar projetos: ' + error.message);
+
+      const byOpp = {};
+      (data || []).forEach(r => { (byOpp[r.opp_number] ||= []).push({ id: r.project_id, name: r.project_name }); });
+      scanned.forEach(e => {
+        const projects = byOpp[e.opp] || [];
+        e.project = projects[0] || null;
+        e.ambiguous = projects.length > 1;
+      });
+
+      // Marcar o que já foi registado antes (evita duplicados)
+      const projectIds = [...new Set(scanned.filter(e => e.project).map(e => e.project.id))];
+      if (projectIds.length) {
+        const { data: existing, error: exErr } = await supabaseClient
+          .from('project_calendar_events')
+          .select('project_id, external_key')
+          .eq('user_id', currentUser.id)
+          .in('project_id', projectIds);
+        if (exErr) throw new Error('Erro ao ler registos existentes: ' + exErr.message);
+        const done = new Set((existing || []).map(r => r.project_id + '|' + r.external_key));
+        scanned.forEach(e => { e.registered = !!e.project && done.has(e.project.id + '|' + e.key); });
+      }
+      scanned.forEach(e => { e.selected = !!e.project && !e.registered && !e.allDay; });
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+    function renderResults() {
+      const el = document.getElementById('results');
+      if (!scanned.length) {
+        el.innerHTML = '<div class="empty">Nenhuma marcação com ID de OPP (ex.: OPP-26-0000123) neste intervalo.</div>';
+        return;
+      }
+      const idx = scanned.map((e, i) => i);
+      const matched = idx.filter(i => scanned[i].project);
+      const unmatched = idx.filter(i => !scanned[i].project);
+
+      const card = i => {
+        const e = scanned[i];
+        const cls = e.registered ? 'done' : (e.project ? '' : 'nomatch');
+        const badge = e.registered
+          ? `<span class="badge ok">Já registado · ${esc(e.project.name)}</span>`
+          : e.project
+            ? `<span class="badge">${esc(e.opp)} → ${esc(e.project.name)}${e.ambiguous ? ' (+ outros projetos)' : ''}</span>`
+            : `<span class="badge warn">${esc(e.opp)} · sem projeto no Hub (ou sem acesso)</span>`;
+        const note = e.allDay ? '<div class="ev-meta">Dia inteiro — ignorado</div>' : '';
+        const canSelect = e.project && !e.registered && !e.allDay;
+        return `<div class="ev ${cls}">
+          <input type="checkbox" ${e.selected ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleEvent(${i}, this.checked)">
+          <div class="ev-body">
+            <div class="ev-subject">${esc(e.subject)}</div>
+            <div class="ev-meta">${esc(fmtWhen(e.startIso, e.endIso))}</div>
+            ${badge}${note}
+          </div>
+          <div class="ev-dur">${fmtDuration(e.minutes)}</div>
+        </div>`;
+      };
+
+      el.innerHTML =
+        (matched.length ? `<div class="group-title">Com projeto (${matched.length})</div>${matched.map(card).join('')}` : '') +
+        (unmatched.length ? `<div class="group-title">Sem projeto (${unmatched.length})</div>${unmatched.map(card).join('')}` : '') +
+        `<div class="summary">
+           <div class="summary-line"><span id="selCount"></span><strong id="selTotal"></strong></div>
+           <button class="btn btn-primary" id="btnRegister" onclick="handleRegister()">Registar horas no Hub</button>
+         </div>`;
+      updateSummary();
+    }
+
+    function toggleEvent(i, checked) { scanned[i].selected = checked; updateSummary(); }
+
+    function updateSummary() {
+      const sel = scanned.filter(e => e.selected);
+      const total = sel.reduce((s, e) => s + e.minutes, 0);
+      const c = document.getElementById('selCount'), t = document.getElementById('selTotal'), b = document.getElementById('btnRegister');
+      if (!c) return;
+      c.textContent = `${sel.length} marcaç${sel.length === 1 ? 'ão selecionada' : 'ões selecionadas'}`;
+      t.textContent = fmtDuration(total);
+      b.disabled = sel.length === 0;
+    }
+
+    // ── Registar no Hub ──────────────────────────────────────────────────────
+    async function handleRegister() {
+      hideAlert('syncError'); hideAlert('syncSuccess');
+      const sel = scanned.filter(e => e.selected && e.project && e.minutes > 0);
+      if (!sel.length) return;
+      setLoading('btnRegister', true, 'A registar...');
+      try {
+        const rows = sel.map(e => ({
+          project_id: e.project.id,
+          user_id: currentUser.id,
+          opp_number: e.opp,
+          subject: e.subject,
+          start_time: e.startIso,
+          end_time: e.endIso,
+          duration_minutes: e.minutes,
+          external_key: e.key,
+        }));
+        const { error } = await supabaseClient
+          .from('project_calendar_events')
+          .upsert(rows, { onConflict: 'user_id,project_id,external_key' });
+        if (error) throw new Error(error.message);
+
+        const total = sel.reduce((s, e) => s + e.minutes, 0);
+        const nProjects = new Set(sel.map(e => e.project.id)).size;
+        sel.forEach(e => { e.registered = true; e.selected = false; });
+        renderResults();
+        showAlert('syncSuccess', `${sel.length} marcaç${sel.length === 1 ? 'ão registada' : 'ões registadas'} (${fmtDuration(total)}) em ${nProjects} projeto${nProjects === 1 ? '' : 's'}. Visível na tab Calendário.`);
+      } catch (err) {
+        showAlert('syncError', 'Erro ao registar: ' + (err.message || err));
+        setLoading('btnRegister', false, 'Registar horas no Hub');
+        updateSummary();
+      }
+    }
+  </script>
+</body>
+</html>
